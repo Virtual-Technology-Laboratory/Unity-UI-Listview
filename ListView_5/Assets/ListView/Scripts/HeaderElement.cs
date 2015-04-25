@@ -8,7 +8,7 @@ namespace VTL.ListView
     {
 
         public string text = "Item1";
-        public bool isNumeric = false;
+        public DataType dataType = DataType.String;
         public float preferredWidth = 25f;
 
         public bool? sortAscending = null;
@@ -20,8 +20,8 @@ namespace VTL.ListView
 
         public void Initialize(HeaderElementInfo info)
         {
-            text = info.Name;
-            isNumeric = info.IsNumeric;
+            text = info.text;
+            dataType = info.dataType;
             preferredWidth = info.preferredWidth;
 
             OnValidate();

@@ -1,17 +1,24 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace VTL.ListView
 {
+
+    public enum DataType { String, Bool, Int, Float, Double, DateTime, TimeSpan };
+    public enum HorizontalAlignment {Left, Right};
+
     [System.Serializable]
     public class HeaderElementInfo
     {
-        public string Name = "Item0";
-        public bool IsNumeric = false;
+        public string text = "Item0";
+        public DataType dataType = DataType.String;
+        public string formatString = null;
         public float preferredWidth = 150f;
+        public HorizontalAlignment horizontalAlignment = HorizontalAlignment.Left;
     }
 
     public class ListViewManager : MonoBehaviour
@@ -25,7 +32,7 @@ namespace VTL.ListView
         private List<GameObject> headerElements = new List<GameObject>();
         private List<GameObject> rows = new List<GameObject>();
 
-        private List<Dictionary<string, string>> listData = new List<Dictionary<string, string>>();
+        private List<Dictionary<string, object>> listData = new List<Dictionary<string, object>>();
 
         GameObject header;
         GameObject listPanel;
@@ -39,10 +46,30 @@ namespace VTL.ListView
             listPanelRectTransform = listPanel.GetComponent<RectTransform>();
         }
 
+
+        // Test code
+
         void FixedUpdate()
         {
             if (Input.GetKey("space"))
-                AddRow(new string[] { RandomString(4), RandomString(4), RandomString(4), RandomString(4), RandomString(4) });
+                AddRow(new object[] { RandomString(4), 
+                                      RandomBool(), 
+                                      UnityEngine.Random.Range((int)0, (int)100), 
+                                      UnityEngine.Random.Range(0, 1f), 
+                                      (double)UnityEngine.Random.Range(1e3f, 1e9f), 
+                                      RandomDateTime() });
+        }
+
+        DateTime RandomDateTime()
+        {
+            return new DateTime(UnityEngine.Random.Range((int)1900, 2012),
+                                UnityEngine.Random.Range((int)1, 13),
+                                UnityEngine.Random.Range((int)1, 28));
+        }
+
+        bool RandomBool()
+        {
+            return UnityEngine.Random.Range(0f, 1f) > 0.5f;
         }
 
         string RandomString(int length) 
@@ -50,10 +77,16 @@ namespace VTL.ListView
             string s = "";
             for (int i=0; i<length; i++)
             {
-                s += "abcdefghijklmnopqrstuvwxyz"[Random.Range(0, 26)];
+                s += "abcdefghijklmnopqrstuvwxyz"[UnityEngine.Random.Range(0, 26)];
             }
             return s;
         }
+
+
+
+
+
+
 
         public void BuildHeader()
         {
@@ -73,10 +106,17 @@ namespace VTL.ListView
             //    }
             //} 
 
+            HashSet<string> keys = new HashSet<string>();
+
             headerElements = new List<GameObject>();
             int indx = 0;
             foreach (HeaderElementInfo info in headerElementInfo)
             {
+                if (keys.Contains(info.text))
+                    throw new System.Exception("ListView header elements must have distinct Text properties.");
+
+                keys.Add(info.text);
+
                 headerElements.Add(Instantiate(HeaderElementPrefab));
                 indx = headerElements.Count - 1;
                 headerElements[indx].transform.SetParent(header.transform);
@@ -84,10 +124,10 @@ namespace VTL.ListView
             }
         }
 
-        void AddRow(string[] fieldData)
+        void AddRow(object[] fieldData)
         {
             if (fieldData.Length != headerElementInfo.Count)
-                Debug.Log("fieldData does not match the size of the table!");
+                throw new System.Exception("fieldData does not match the size of the table!");
 
             rows.Add(Instantiate(RowPrefab));
             int indx = rows.Count - 1;
@@ -96,26 +136,27 @@ namespace VTL.ListView
             listPanelRectTransform.sizeDelta =
                 new Vector2(listPanelRectTransform.sizeDelta.x, rows.Count * 30f);
 
-            listData.Add(new Dictionary<string, string>());
+            listData.Add(new Dictionary<string, object>());
 
             for (int i = 0; i < fieldData.Length; i++)
             {
-                listData[indx].Add(headerElementInfo[i].Name, fieldData[i]);
+                listData[indx].Add(headerElementInfo[i].text, fieldData[i]);
             }
-            listData[indx].Add("__Selected__", "false");
-            listData[indx].Add("__Index__", indx.ToString());
+
+            listData[indx].Add("__Selected__", false);
+            listData[indx].Add("__Index__", indx);
 
         }
 
         public void SetRowSelection(int index, bool selectedState)
         {
-            listData[index]["__Selected__"] = selectedState ? "true" : "false";
+            listData[index]["__Selected__"] = selectedState;
         }
 
         public void Sort(string key, bool sortAscending)
         {
             // Use Linq to sort the list of dictionaries
-            IEnumerable<Dictionary<string, string>> query;
+            IEnumerable<Dictionary<string, object>> query;
 
 
             if (sortAscending)
@@ -127,17 +168,17 @@ namespace VTL.ListView
             int i = 0;
             int indx;
             bool selected;
-            foreach (Dictionary<string, string> rowDict in query)
+            foreach (Dictionary<string, object> rowDict in query)
             {
                 // build the field data array
-                string[] fieldData = new string[headerElementInfo.Count];
+                object[] fieldData = new object[headerElementInfo.Count];
                 for (int j=0; j<headerElementInfo.Count; j++)
                 {
-                    fieldData[j] = rowDict[headerElementInfo[j].Name];
+                    fieldData[j] = rowDict[headerElementInfo[j].text];
                 }
                 indx = System.Convert.ToInt32(rowDict["__Index__"]);
-                selected = rowDict["__Selected__"].Contains("true");
-                rows[i].GetComponent<Row>().SetFields(fieldData, indx, selected);
+                selected = (bool)rowDict["__Selected__"];
+                rows[i].GetComponent<Row>().SetFields(fieldData, indx, selected, headerElementInfo);
                 i++;
             }
 
@@ -149,6 +190,11 @@ namespace VTL.ListView
                 if (headerElement != null)
                     headerElement.SetSortState(headerElement.text == key ? sortAscending : (bool?)null);
             }
+
+        }
+
+        public void RemoveAt(int index)
+        {
 
         }
     }
