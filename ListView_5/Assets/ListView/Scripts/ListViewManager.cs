@@ -13,7 +13,6 @@ using UnityEngine.UI;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace VTL.ListView
 {
@@ -36,6 +35,8 @@ namespace VTL.ListView
         public List<HeaderElementInfo> headerElementInfo = new List<HeaderElementInfo>();
 
         public float rowHeight = 26f;
+        public Color unselectedColor = Color.white;
+        public Color selectedColor = new Color(0.1f, 0.1f, 0.1f, 0.4f);
 
         public GameObject HeaderElementPrefab;
         public GameObject RowPrefab;
@@ -44,11 +45,18 @@ namespace VTL.ListView
         private List<GameObject> headerElements = new List<GameObject>();
         private Dictionary<Guid, GameObject> rows = new Dictionary<Guid, GameObject>();
 
+        [HideInInspector]
         public Dictionary<Guid, Dictionary<string, object>> listData = new Dictionary<Guid, Dictionary<string, object>>();
 
-        GameObject header;
-        GameObject listPanel;
-        RectTransform listPanelRectTransform;
+        private GameObject header;
+        private GameObject listPanel;
+        private RectTransform listPanelRectTransform;
+        
+        [HideInInspector] 
+        public bool shiftDown = false;
+
+        [HideInInspector]
+        public List<int> shiftDownSelections = new List<int>();
 
         // Use this for initialization
         void Awake()
@@ -56,42 +64,56 @@ namespace VTL.ListView
             header = transform.Find("Header").gameObject;
             listPanel = transform.Find("List/ListPanel").gameObject;
             listPanelRectTransform = listPanel.GetComponent<RectTransform>();
+
+            foreach (Transform child in header.transform)
+            {
+                if (!child.gameObject.activeSelf)
+                    Destroy(child.gameObject);
+            }
         }
 
-
-        public void BuildHeader()
+        void Update()
         {
+            shiftDown = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+
+            if (Input.GetKeyUp(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
+                shiftDownSelections.Clear();
+
+        }
+
+        public void OnValidate()
+        {
+            if (headerElementInfo.Count > 32)
+                throw new System.Exception("Add additional HeaderElement prefabs as children of Header");
+
             header = transform.Find("Header").gameObject;
             listPanel = transform.Find("List/ListPanel").gameObject;
 
-            //headerElements.RemoveRange(0, headerElements.Count);
-            //for (int i = transform.childCount - 1; i >= 0; --i)
-            //{
-            //    var child = transform.GetChild(i).gameObject;
-            //    if (child.GetComponent<HeaderElement>() != null)
-            //    {
-            //        UnityEditor.EditorApplication.delayCall += () =>
-            //        {
-            //            DestroyImmediate(child);
-            //        };
-            //    }
-            //} 
+            foreach (Transform child in header.transform)
+                child.gameObject.SetActive(false);
 
             HashSet<string> keys = new HashSet<string>();
 
             headerElements = new List<GameObject>();
-            int indx = 0;
+            int i = 0;
             foreach (HeaderElementInfo info in headerElementInfo)
             {
                 if (keys.Contains(info.text))
                     throw new System.Exception("ListView header elements must have distinct Text properties.");
-
                 keys.Add(info.text);
 
-                headerElements.Add(Instantiate(HeaderElementPrefab));
-                indx = headerElements.Count - 1;
-                headerElements[indx].transform.SetParent(header.transform);
-                headerElements[indx].GetComponent<HeaderElement>().Initialize(info);
+                // For whatever reason it runs OnValidate when you hit play and it fails to 
+                // find the children of header. At this point Application.isPlaying is still false
+                // so it isn't clear how to cleanly detect this special state. Anyhoo, that is why
+                // this try/catch exists
+                try
+                {
+                    headerElements.Add(header.transform.GetChild(i).gameObject);
+                    headerElements[i].SetActive(true);
+                    headerElements[i].GetComponent<HeaderElement>().Initialize(info);
+                }
+                catch { return; }
+                i++;
             }
         }
 
@@ -125,9 +147,54 @@ namespace VTL.ListView
 
         }
 
+        public void OnSelectionEvent(Guid guid, int index)
+        {
+            if (shiftDown)
+            {
+                shiftDownSelections.Add(index);
+
+                if (shiftDownSelections.Count == 1)
+                    SetRowSelection(guid, true);
+                else
+                {
+                    int minIndx = Mathf.Min(shiftDownSelections.ToArray());
+                    int maxIndx = Mathf.Max(shiftDownSelections.ToArray());
+                    for (int i = minIndx; i < maxIndx + 1; i++)
+                    {
+                        SetRowSelection(i, true);
+                    }
+                }
+            }
+            else
+            {
+                SetRowSelection(guid, !rows[guid].GetComponent<Row>().isSelected);
+            }
+        }
+
+        public void SelectAll()
+        {
+            foreach (var item in rows)
+                SetRowSelection(item.Key, true);
+        }
+
+        public void DeselectAll()
+        {
+            foreach (var item in rows)
+                SetRowSelection(item.Key, false);
+        }
+
+        public void SetRowSelection(int index, bool selectedState)
+        {
+            SetRowSelection(GetGuidAtIndex(index), selectedState);
+        }
+
         public void SetRowSelection(Guid guid, bool selectedState)
         {
             listData[guid]["__Selected__"] = selectedState;
+
+            Row row = rows[guid].GetComponent<Row>();
+            row.isSelected = selectedState;
+            row.SetSelectionAppearance();
         }
 
         public void Sort(string key)
@@ -137,6 +204,7 @@ namespace VTL.ListView
 
         public void Sort(string key, bool sortAscending)
         {
+            // Check that key is valid
             bool foundKey = false;
             foreach (HeaderElementInfo info in headerElementInfo)
                 if (info.text.Equals(key))
@@ -145,23 +213,35 @@ namespace VTL.ListView
             if (!foundKey)
                 throw new System.Exception("Key not in listview: " + key);
 
-            // Use Linq to sort the list of dictionaries
-            IEnumerable<Dictionary<string, object>> query;
+            // Here we sort without Linq for maximum platform compatibility
+            // We only need to sort unique elements of a column. So we create
+            // a lookup dictionary to get all Guids that coorespond to a
+            // particular unique element
+            Dictionary<object, List<Guid>> lookup = new Dictionary<object, List<Guid>>();
+            foreach (var item in listData)
+            {
+                if (!lookup.ContainsKey(item.Value[key]))
+                    lookup[item.Value[key]] = new List<Guid>();
 
+                lookup[item.Value[key]].Add(item.Key);
+            }
 
-            if (sortAscending)
-                query = listData.Values.OrderBy(x => x.ContainsKey(key) ? x[key] : string.Empty);
-            else
-                query = listData.Values.OrderByDescending(x => x.ContainsKey(key) ? x[key] : string.Empty);
+            // Now sort the keys to the lookup table
+            List<object> uniqueElements = new List<object>(lookup.Keys);
+            uniqueElements.Sort(); // Sort in place
+
+            if (!sortAscending)
+                uniqueElements.Reverse(); // Reverse in place
 
             // Reorder the rows
             int i = 0;
-            Guid guid;
-            foreach (Dictionary<string, object> rowData in query)
+            foreach (object objKey in uniqueElements)
             {
-                guid = (Guid)rowData["__Guid__"];
-                rows[guid].transform.SetSiblingIndex(i);
-                i++;
+                foreach (Guid guid in lookup[objKey])
+                {
+                    rows[guid].transform.SetSiblingIndex(i);
+                    i++;
+                }
             }
 
             // Set the arrow states for the header fields
@@ -171,7 +251,6 @@ namespace VTL.ListView
                 if (headerElement != null)
                     headerElement.SetSortState(headerElement.text == key ? sortAscending : (bool?)null);
             }
-
         }
 
         public Guid GetGuidAtIndex(int index)
