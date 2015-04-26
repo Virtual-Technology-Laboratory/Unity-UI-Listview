@@ -46,7 +46,7 @@
 	</Reference>
   </ItemGroup>
   <ItemGroup>
-     <Compile Include="Assets\ListView\Scripts\Examples\ListViewExample.cs" />
+     <Compile Include="Assets\ListView\Example\ListViewExample.cs" />
      <Compile Include="Assets\ListView\Scripts\HeaderElement.cs" />
      <Compile Include="Assets\ListView\Scripts\ListViewManager.cs" />
      <Compile Include="Assets\ListView\Scripts\Row.cs" />

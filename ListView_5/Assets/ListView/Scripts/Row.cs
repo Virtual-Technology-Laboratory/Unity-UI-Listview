@@ -19,16 +19,10 @@ namespace VTL.ListView
 {
     public class Row : MonoBehaviour
     {
-
-        private ListViewManager listViewManager;
-
         public bool isSelected = false;
+        public Guid guid;
 
-        public Guid guid; 
-
-        public Color unselectedColor = Color.white; //new Color(0, 0, 0, 100 / 255);
-        public Color selectedColor = new Color(0.1f, 0.1f, 0.1f, 0.4f);
-
+        private ListViewManager listViewManager; 
         private Image image;
 
         public List<GameObject> rowElements = new List<GameObject>();
@@ -89,19 +83,27 @@ namespace VTL.ListView
                 return obj.ToString();
         }
 
+        public void SetSelectionAppearance()
+        {
+            image.color = isSelected ? listViewManager.selectedColor : 
+                                       listViewManager.unselectedColor;
+        }
+
         public void SetFields(object[] fieldData, Guid _guid, bool selected,
                               List<HeaderElementInfo> headerElementInfo)
         {
             guid = _guid;
             isSelected = selected;
-            image.color = isSelected ? selectedColor : unselectedColor;
+            SetSelectionAppearance();
 
             Debug.Log(guid.ToString() + ", " + isSelected.ToString());
 
             for (int i = 0; i < headerElementInfo.Count; i++)
             {
                 rowElements[i].GetComponentInChildren<Text>().text =
-                    StringifyObject(fieldData[i], headerElementInfo[i].formatString, headerElementInfo[i].dataType); 
+                    StringifyObject(fieldData[i], 
+                                    headerElementInfo[i].formatString, 
+                                    headerElementInfo[i].dataType); 
             }
         }
 
@@ -110,20 +112,20 @@ namespace VTL.ListView
         {
             guid = _guid;
             isSelected = selected;
-            image.color = isSelected ? selectedColor : unselectedColor;
+            SetSelectionAppearance();
 
             for (int i = 0; i < headerElementInfo.Count; i++)
             {
                 rowElements[i].GetComponentInChildren<Text>().text =
-                    StringifyObject(rowData[headerElementInfo[i].text], headerElementInfo[i].formatString, headerElementInfo[i].dataType);
+                    StringifyObject(rowData[headerElementInfo[i].text], 
+                                    headerElementInfo[i].formatString, 
+                                    headerElementInfo[i].dataType);
             }
         }
 
-        public void OnSelectEvent()
+        public void OnSelectionEvent()
         {
-            isSelected = !isSelected;
-            image.color = isSelected ? selectedColor : unselectedColor;
-            listViewManager.SetRowSelection(guid, isSelected);
+            listViewManager.OnSelectionEvent(guid, transform.GetSiblingIndex());
         }
     }
 }
