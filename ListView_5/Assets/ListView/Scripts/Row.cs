@@ -12,12 +12,12 @@ namespace VTL.ListView
 
         private ListViewManager listViewManager;
 
-        public bool IsSelected = false;
+        public bool isSelected = false;
 
-        public int Index = 0; // Row stores index to track cooresponding reference in 
+        public Guid guid; 
 
-        private Color unselectedColor = Color.white; //new Color(0, 0, 0, 100 / 255);
-        private Color selectedColor = new Color(0.1f, 0.1f, 0.1f, 0.4f);
+        public Color unselectedColor = Color.white; //new Color(0, 0, 0, 100 / 255);
+        public Color selectedColor = new Color(0.1f, 0.1f, 0.1f, 0.4f);
 
         private Image image;
 
@@ -32,11 +32,11 @@ namespace VTL.ListView
             image = gameObject.GetComponent<Image>();
         }
 
-        public void Initialize(object[] fieldData, int index,
+        public void Initialize(object[] fieldData, Guid _guid,
                                List<HeaderElementInfo> headerElementInfo, 
                                GameObject RowElementPrefab)
         {
-            Index = index;
+            guid = _guid;
             transform.localScale = Vector3.one;
 
             rowElements = new List<GameObject>();
@@ -79,25 +79,41 @@ namespace VTL.ListView
                 return obj.ToString();
         }
 
-        public void SetFields(object[] fieldData, int index, bool selected,
+        public void SetFields(object[] fieldData, Guid _guid, bool selected,
                               List<HeaderElementInfo> headerElementInfo)
         {
-            Index = index;
-            IsSelected = selected;
-            image.color = IsSelected ? selectedColor : unselectedColor;
+            guid = _guid;
+            isSelected = selected;
+            image.color = isSelected ? selectedColor : unselectedColor;
 
-            for (int i = 0; i < fieldData.Length; i++)
+            Debug.Log(guid.ToString() + ", " + isSelected.ToString());
+
+            for (int i = 0; i < headerElementInfo.Count; i++)
             {
                 rowElements[i].GetComponentInChildren<Text>().text =
                     StringifyObject(fieldData[i], headerElementInfo[i].formatString, headerElementInfo[i].dataType); 
             }
         }
 
+        public void SetFields(Dictionary<string, object> rowData, Guid _guid, bool selected,
+                              List<HeaderElementInfo> headerElementInfo)
+        {
+            guid = _guid;
+            isSelected = selected;
+            image.color = isSelected ? selectedColor : unselectedColor;
+
+            for (int i = 0; i < headerElementInfo.Count; i++)
+            {
+                rowElements[i].GetComponentInChildren<Text>().text =
+                    StringifyObject(rowData[headerElementInfo[i].text], headerElementInfo[i].formatString, headerElementInfo[i].dataType);
+            }
+        }
+
         public void OnSelectEvent()
         {
-            IsSelected = !IsSelected;
-            image.color = IsSelected ? selectedColor : unselectedColor;
-            listViewManager.SetRowSelection(Index, IsSelected);
+            isSelected = !isSelected;
+            image.color = isSelected ? selectedColor : unselectedColor;
+            listViewManager.SetRowSelection(guid, isSelected);
         }
     }
 }

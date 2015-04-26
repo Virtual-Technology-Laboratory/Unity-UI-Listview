@@ -46,6 +46,9 @@
 	</Reference>
   </ItemGroup>
   <ItemGroup>
+     <Compile Include="Assets\ListView\Scripts\Examples\ListViewExample.cs" />
+     <Compile Include="Assets\ListView\Scripts\GenericOrderedDictionary\IOrderedDictionary.cs" />
+     <Compile Include="Assets\ListView\Scripts\GenericOrderedDictionary\OrderedDictionary.cs" />
      <Compile Include="Assets\ListView\Scripts\HeaderElement.cs" />
      <Compile Include="Assets\ListView\Scripts\ListViewManager.cs" />
      <Compile Include="Assets\ListView\Scripts\Row.cs" />

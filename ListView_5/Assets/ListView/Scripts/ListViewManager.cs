@@ -25,14 +25,16 @@ namespace VTL.ListView
     {
         public List<HeaderElementInfo> headerElementInfo = new List<HeaderElementInfo>();
 
+        public float rowHeight = 26f;
+
         public GameObject HeaderElementPrefab;
         public GameObject RowPrefab;
         public GameObject RowElementPrefab;
 
         private List<GameObject> headerElements = new List<GameObject>();
-        private List<GameObject> rows = new List<GameObject>();
+        private Dictionary<Guid, GameObject> rows = new Dictionary<Guid, GameObject>();
 
-        private List<Dictionary<string, object>> listData = new List<Dictionary<string, object>>();
+        public Dictionary<Guid, Dictionary<string, object>> listData = new Dictionary<Guid, Dictionary<string, object>>();
 
         GameObject header;
         GameObject listPanel;
@@ -45,47 +47,6 @@ namespace VTL.ListView
             listPanel = transform.Find("List/ListPanel").gameObject;
             listPanelRectTransform = listPanel.GetComponent<RectTransform>();
         }
-
-
-        // Test code
-
-        void FixedUpdate()
-        {
-            if (Input.GetKey("space"))
-                AddRow(new object[] { RandomString(4), 
-                                      RandomBool(), 
-                                      UnityEngine.Random.Range((int)0, (int)100), 
-                                      UnityEngine.Random.Range(0, 1f), 
-                                      (double)UnityEngine.Random.Range(1e3f, 1e9f), 
-                                      RandomDateTime() });
-        }
-
-        DateTime RandomDateTime()
-        {
-            return new DateTime(UnityEngine.Random.Range((int)1900, 2012),
-                                UnityEngine.Random.Range((int)1, 13),
-                                UnityEngine.Random.Range((int)1, 28));
-        }
-
-        bool RandomBool()
-        {
-            return UnityEngine.Random.Range(0f, 1f) > 0.5f;
-        }
-
-        string RandomString(int length) 
-        {
-            string s = "";
-            for (int i=0; i<length; i++)
-            {
-                s += "abcdefghijklmnopqrstuvwxyz"[UnityEngine.Random.Range(0, 26)];
-            }
-            return s;
-        }
-
-
-
-
-
 
 
         public void BuildHeader()
@@ -124,66 +85,76 @@ namespace VTL.ListView
             }
         }
 
-        void AddRow(object[] fieldData)
+        void SetListPanelHeight()
+        {
+            listPanelRectTransform.sizeDelta =
+                new Vector2(listPanelRectTransform.sizeDelta.x, rows.Count * rowHeight);
+        }
+
+        public void AddRow(object[] fieldData)
         {
             if (fieldData.Length != headerElementInfo.Count)
                 throw new System.Exception("fieldData does not match the size of the table!");
 
-            rows.Add(Instantiate(RowPrefab));
-            int indx = rows.Count - 1;
-            rows[indx].transform.SetParent(listPanel.transform);
-            rows[indx].GetComponent<Row>().Initialize(fieldData, indx, headerElementInfo, RowElementPrefab);
-            listPanelRectTransform.sizeDelta =
-                new Vector2(listPanelRectTransform.sizeDelta.x, rows.Count * 30f);
+            Guid guid = Guid.NewGuid();
 
-            listData.Add(new Dictionary<string, object>());
+            rows.Add(guid, Instantiate(RowPrefab));
+            rows[guid].transform.SetParent(listPanel.transform);
+            rows[guid].GetComponent<Row>().Initialize(fieldData, guid, headerElementInfo, RowElementPrefab);
+            SetListPanelHeight();
+
+            listData.Add(guid, new Dictionary<string, object>());
 
             for (int i = 0; i < fieldData.Length; i++)
             {
-                listData[indx].Add(headerElementInfo[i].text, fieldData[i]);
+                listData[guid].Add(headerElementInfo[i].text, fieldData[i]);
             }
 
-            listData[indx].Add("__Selected__", false);
-            listData[indx].Add("__Index__", indx);
+            listData[guid].Add("__Selected__", false);
+            listData[guid].Add("__Guid__", guid);
 
         }
 
-        public void SetRowSelection(int index, bool selectedState)
+        public void SetRowSelection(Guid guid, bool selectedState)
         {
-            listData[index]["__Selected__"] = selectedState;
+            listData[guid]["__Selected__"] = selectedState;
+        }
+
+        public void Sort(string key)
+        {
+            Sort(key, true);
         }
 
         public void Sort(string key, bool sortAscending)
         {
+            bool foundKey = false;
+            foreach (HeaderElementInfo info in headerElementInfo)
+                if (info.text.Equals(key))
+                    foundKey = true;
+
+            if (!foundKey)
+                throw new System.Exception("Key not in listview: " + key);
+
             // Use Linq to sort the list of dictionaries
             IEnumerable<Dictionary<string, object>> query;
 
 
             if (sortAscending)
-                query = listData.OrderBy(x => x.ContainsKey(key) ? x[key] : string.Empty);
+                query = listData.Values.OrderBy(x => x.ContainsKey(key) ? x[key] : string.Empty);
             else
-                query = listData.OrderByDescending(x => x.ContainsKey(key) ? x[key] : string.Empty);
+                query = listData.Values.OrderByDescending(x => x.ContainsKey(key) ? x[key] : string.Empty);
 
-            // Update the rows
+            // Reorder the rows
             int i = 0;
-            int indx;
-            bool selected;
-            foreach (Dictionary<string, object> rowDict in query)
+            Guid guid;
+            foreach (Dictionary<string, object> rowData in query)
             {
-                // build the field data array
-                object[] fieldData = new object[headerElementInfo.Count];
-                for (int j=0; j<headerElementInfo.Count; j++)
-                {
-                    fieldData[j] = rowDict[headerElementInfo[j].text];
-                }
-                indx = System.Convert.ToInt32(rowDict["__Index__"]);
-                selected = (bool)rowDict["__Selected__"];
-                rows[i].GetComponent<Row>().SetFields(fieldData, indx, selected, headerElementInfo);
+                guid = (Guid)rowData["__Guid__"];
+                rows[guid].transform.SetSiblingIndex(i);
                 i++;
             }
 
             // Set the arrow states for the header fields
-
             foreach (Transform child in header.transform)
             {
                 HeaderElement headerElement = child.GetComponent<HeaderElement>();
@@ -193,9 +164,90 @@ namespace VTL.ListView
 
         }
 
+        public Guid GetGuidAtIndex(int index)
+        {
+            return listPanel.transform.GetChild(index).GetComponent<Row>().guid;
+        }
+
+        public void UpdateRow(Guid guid, object[] fieldData)
+        {
+            if (fieldData.Length != headerElementInfo.Count)
+                throw new System.Exception("fieldData does not match the size of the table!");
+
+            for (int i = 0; i < fieldData.Length; i++)
+            {
+                listData[guid][headerElementInfo[i].text] = fieldData[i];
+            }
+
+            bool selected = (bool)listData[guid]["__Selected__"];
+            rows[guid].GetComponent<Row>().SetFields(fieldData, guid, selected, headerElementInfo);
+        }
+
+        public void UpdateRow(int index, object[] fieldData)
+        {
+            UpdateRow(GetGuidAtIndex(index), fieldData);
+        }
+
+        public void UpdateRow(Guid guid, Dictionary<string, object> rowData)
+        {
+            foreach (var item in rowData)
+                listData[guid][item.Key] = item.Value;
+
+            bool selected = (bool)listData[guid]["__Selected__"];
+            rows[guid].GetComponent<Row>().SetFields(listData[guid], guid, selected, headerElementInfo);
+        }
+
+        public void UpdateRow(int index, Dictionary<string, object> rowData)
+        {
+            UpdateRow(GetGuidAtIndex(index), rowData);
+        }
+
+        public void UpdateRowField(Guid guid, string key, object data)
+        {
+            listData[guid][key] = data;
+
+            bool selected = (bool)listData[guid]["__Selected__"];
+            rows[guid].GetComponent<Row>().SetFields(listData[guid], guid, selected, headerElementInfo);
+        }
+
+        public void UpdateRowField(int index, string key, object data)
+        {
+            UpdateRowField(GetGuidAtIndex(index), key, data);
+        }
+
+        public IEnumerator Selected()
+        {
+            var buffer = new List<Guid>();
+            foreach (Dictionary<string, object> rowData in listData.Values)
+            {
+                if ((bool)rowData["__Selected__"])
+                    buffer.Add((Guid)rowData["__Guid__"]);
+            }
+
+            foreach (Guid guid in buffer)
+                yield return guid;
+        }
+
+        public void RemoveSelected()
+        {
+            IEnumerator ienObj = Selected();
+
+            while (ienObj.MoveNext())
+                Remove((Guid)ienObj.Current);
+        }
+
+        public void Remove(Guid guid)
+        {
+            Destroy(rows[guid]);
+            rows.Remove(guid);
+            listData.Remove(guid);
+            SetListPanelHeight();
+        }
+
         public void RemoveAt(int index)
         {
-
+            Remove(GetGuidAtIndex(index));
         }
+
     }
 }
