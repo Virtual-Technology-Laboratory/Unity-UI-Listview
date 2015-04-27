@@ -70,16 +70,15 @@ namespace VTL.ListView
 
             // Destroy unneeded header elements
             foreach (Transform child in header.transform)
-            {
                 if (!child.gameObject.activeSelf)
                     Destroy(child.gameObject);
-            }
         }
 
         void Update()
         {
             shiftDown = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
 
+            // On shift keyup we can reset the selection
             if (Input.GetKeyUp(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
                 shiftDownSelections.Clear();
         }
@@ -101,7 +100,7 @@ namespace VTL.ListView
             HashSet<string> keys = new HashSet<string>();
 
             // Loop through and setup the header elements
-            headerElements = new List<GameObject>();
+            headerElements.Clear();
             int i = 0;
             foreach (var info in headerElementInfo)
             {
