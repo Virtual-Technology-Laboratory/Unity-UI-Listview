@@ -8,7 +8,7 @@
  * 
  */
  
- using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
 
@@ -16,20 +16,26 @@ namespace VTL.ListView
 {
     public class HeaderElement : MonoBehaviour
     {
-
         public string text = "Item1";
         public DataType dataType = DataType.String;
         public float preferredWidth = 25f;
 
         public bool? sortAscending = null;
 
-        private ListViewManager listViewManager;
+        ListViewManager listViewManager;
 
-        private GameObject ascendIcon;
-        private GameObject descendIcon;
+        GameObject ascendIcon;
+        GameObject descendIcon;
 
         public void Initialize(HeaderElementInfo info)
         {
+            listViewManager = transform.parent.
+                              transform.parent.gameObject.GetComponent<ListViewManager>();
+            gameObject.GetComponent<Button>().onClick.AddListener(SortHandler);
+
+            ascendIcon = transform.Find("SortAscending").gameObject;
+            descendIcon = transform.Find("SortDescending").gameObject;
+
             text = info.text;
             dataType = info.dataType;
             preferredWidth = info.preferredWidth;
@@ -43,36 +49,26 @@ namespace VTL.ListView
             gameObject.GetComponent<LayoutElement>().preferredWidth = preferredWidth;
         }
 
-        // Use this for initialization
-        void Start()
-        {
-            listViewManager = transform.parent.transform.parent.gameObject.GetComponent<ListViewManager>();
-            gameObject.GetComponent<Button>().onClick.AddListener(SortHandler);
-
-            ascendIcon = transform.Find("SortAscending").gameObject;
-            descendIcon = transform.Find("SortDescending").gameObject;
-        }
-
         public void SortHandler()
         {
             if (sortAscending == null || sortAscending == false)
                 sortAscending = true;
             else
                 sortAscending = false;
+
             listViewManager.Sort(text, (bool)sortAscending);
-           
         }
 
-        public void SetSortState(bool? theState)
+        public void SetSortState(bool? sortState)
         {
-            sortAscending = theState;
+            sortAscending = sortState;
 
-            if (theState == true)
+            if (sortState == true)
             {
                 ascendIcon.SetActive(true);
                 descendIcon.SetActive(false);
             }
-            else if (theState == false)
+            else if (sortState == false)
             {
                 ascendIcon.SetActive(false);
                 descendIcon.SetActive(true);

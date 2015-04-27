@@ -42,15 +42,18 @@ namespace VTL.ListView
         public GameObject RowPrefab;
         public GameObject RowElementPrefab;
 
-        private List<GameObject> headerElements = new List<GameObject>();
-        private Dictionary<Guid, GameObject> rows = new Dictionary<Guid, GameObject>();
+        List<GameObject> headerElements = new List<GameObject>();
+        Dictionary<Guid, GameObject> rows = new Dictionary<Guid, GameObject>();
 
         [HideInInspector]
-        public Dictionary<Guid, Dictionary<string, object>> listData = new Dictionary<Guid, Dictionary<string, object>>();
+        public Dictionary<Guid, Dictionary<string, object>> listData = 
+            new Dictionary<Guid, Dictionary<string, object>>();
+        const string SELECTED = "__Selected__";
+        const string GUID = "__Guid__";
 
-        private GameObject header;
-        private GameObject listPanel;
-        private RectTransform listPanelRectTransform;
+        GameObject header;
+        GameObject listPanel;
+        RectTransform listPanelRectTransform;
         
         [HideInInspector] 
         public bool shiftDown = false;
@@ -65,6 +68,7 @@ namespace VTL.ListView
             listPanel = transform.Find("List/ListPanel").gameObject;
             listPanelRectTransform = listPanel.GetComponent<RectTransform>();
 
+            // Destroy unneeded header elements
             foreach (Transform child in header.transform)
             {
                 if (!child.gameObject.activeSelf)
@@ -78,7 +82,6 @@ namespace VTL.ListView
 
             if (Input.GetKeyUp(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
                 shiftDownSelections.Clear();
-
         }
 
         public void OnValidate()
@@ -89,14 +92,18 @@ namespace VTL.ListView
             header = transform.Find("Header").gameObject;
             listPanel = transform.Find("List/ListPanel").gameObject;
 
+            // reset all the header elements to inactive
             foreach (Transform child in header.transform)
                 child.gameObject.SetActive(false);
 
+            // Need to make sure that duplicate column names are not present
+            // This HashSet is used to make sure duplicates do not exist.
             HashSet<string> keys = new HashSet<string>();
 
+            // Loop through and setup the header elements
             headerElements = new List<GameObject>();
             int i = 0;
-            foreach (HeaderElementInfo info in headerElementInfo)
+            foreach (var info in headerElementInfo)
             {
                 if (keys.Contains(info.text))
                     throw new System.Exception("ListView header elements must have distinct Text properties.");
@@ -105,7 +112,7 @@ namespace VTL.ListView
                 // For whatever reason it runs OnValidate when you hit play and it fails to 
                 // find the children of header. At this point Application.isPlaying is still false
                 // so it isn't clear how to cleanly detect this special state. Anyhoo, that is why
-                // this try/catch exists
+                // this try/catch is needed.
                 try
                 {
                     headerElements.Add(header.transform.GetChild(i).gameObject);
@@ -132,23 +139,28 @@ namespace VTL.ListView
 
             rows.Add(guid, Instantiate(RowPrefab));
             rows[guid].transform.SetParent(listPanel.transform);
-            rows[guid].GetComponent<Row>().Initialize(fieldData, guid, headerElementInfo, RowElementPrefab);
+            rows[guid].GetComponent<Row>().Initialize(fieldData, guid);
             SetListPanelHeight();
 
             listData.Add(guid, new Dictionary<string, object>());
 
             for (int i = 0; i < fieldData.Length; i++)
-            {
                 listData[guid].Add(headerElementInfo[i].text, fieldData[i]);
-            }
-
-            listData[guid].Add("__Selected__", false);
-            listData[guid].Add("__Guid__", guid);
+          
+            listData[guid].Add(SELECTED, false);
+            listData[guid].Add(GUID, guid);
 
         }
 
         public void OnSelectionEvent(Guid guid, int index)
         {
+            // The selection handling is a little convoluted. Basically each 
+            // row element is a button. For each button the click event is
+            // bound to their parent's Row component which passes the event
+            // here.
+            //
+            // In this method we the selection logic and the SetRowSelection
+            // method calls back to set the appearance of the row.
             if (shiftDown)
             {
                 shiftDownSelections.Add(index);
@@ -160,15 +172,11 @@ namespace VTL.ListView
                     int minIndx = Mathf.Min(shiftDownSelections.ToArray());
                     int maxIndx = Mathf.Max(shiftDownSelections.ToArray());
                     for (int i = minIndx; i < maxIndx + 1; i++)
-                    {
                         SetRowSelection(i, true);
-                    }
                 }
             }
             else
-            {
                 SetRowSelection(guid, !rows[guid].GetComponent<Row>().isSelected);
-            }
         }
 
         public void SelectAll()
@@ -190,11 +198,11 @@ namespace VTL.ListView
 
         public void SetRowSelection(Guid guid, bool selectedState)
         {
-            listData[guid]["__Selected__"] = selectedState;
+            listData[guid][SELECTED] = selectedState;
 
             Row row = rows[guid].GetComponent<Row>();
             row.isSelected = selectedState;
-            row.SetSelectionAppearance();
+            row.UpdateSelectionAppearance();
         }
 
         public void Sort(string key)
@@ -206,7 +214,7 @@ namespace VTL.ListView
         {
             // Check that key is valid
             bool foundKey = false;
-            foreach (HeaderElementInfo info in headerElementInfo)
+            foreach (var info in headerElementInfo)
                 if (info.text.Equals(key))
                     foundKey = true;
 
@@ -238,16 +246,13 @@ namespace VTL.ListView
             foreach (object objKey in uniqueElements)
             {
                 foreach (Guid guid in lookup[objKey])
-                {
-                    rows[guid].transform.SetSiblingIndex(i);
-                    i++;
-                }
+                    rows[guid].transform.SetSiblingIndex(i++);
             }
 
             // Set the arrow states for the header fields
             foreach (Transform child in header.transform)
             {
-                HeaderElement headerElement = child.GetComponent<HeaderElement>();
+                var headerElement = child.GetComponent<HeaderElement>();
                 if (headerElement != null)
                     headerElement.SetSortState(headerElement.text == key ? sortAscending : (bool?)null);
             }
@@ -264,12 +269,10 @@ namespace VTL.ListView
                 throw new System.Exception("fieldData does not match the size of the table!");
 
             for (int i = 0; i < fieldData.Length; i++)
-            {
                 listData[guid][headerElementInfo[i].text] = fieldData[i];
-            }
 
-            bool selected = (bool)listData[guid]["__Selected__"];
-            rows[guid].GetComponent<Row>().SetFields(fieldData, guid, selected, headerElementInfo);
+            bool selected = (bool)listData[guid][SELECTED];
+            rows[guid].GetComponent<Row>().SetFields(fieldData, guid, selected);
         }
 
         public void UpdateRow(int index, object[] fieldData)
@@ -282,8 +285,8 @@ namespace VTL.ListView
             foreach (var item in rowData)
                 listData[guid][item.Key] = item.Value;
 
-            bool selected = (bool)listData[guid]["__Selected__"];
-            rows[guid].GetComponent<Row>().SetFields(listData[guid], guid, selected, headerElementInfo);
+            bool selected = (bool)listData[guid][SELECTED];
+            rows[guid].GetComponent<Row>().SetFields(listData[guid], guid, selected);
         }
 
         public void UpdateRow(int index, Dictionary<string, object> rowData)
@@ -295,8 +298,8 @@ namespace VTL.ListView
         {
             listData[guid][key] = data;
 
-            bool selected = (bool)listData[guid]["__Selected__"];
-            rows[guid].GetComponent<Row>().SetFields(listData[guid], guid, selected, headerElementInfo);
+            bool selected = (bool)listData[guid][SELECTED];
+            rows[guid].GetComponent<Row>().SetFields(listData[guid], guid, selected);
         }
 
         public void UpdateRowField(int index, string key, object data)
@@ -307,11 +310,9 @@ namespace VTL.ListView
         public IEnumerator Selected()
         {
             var buffer = new List<Guid>();
-            foreach (Dictionary<string, object> rowData in listData.Values)
-            {
-                if ((bool)rowData["__Selected__"])
-                    buffer.Add((Guid)rowData["__Guid__"]);
-            }
+            foreach (var rowData in listData.Values)
+                if ((bool)rowData[SELECTED])
+                    buffer.Add((Guid)rowData[GUID]);
 
             foreach (Guid guid in buffer)
                 yield return guid;
@@ -337,6 +338,5 @@ namespace VTL.ListView
         {
             Remove(GetGuidAtIndex(index));
         }
-
     }
 }

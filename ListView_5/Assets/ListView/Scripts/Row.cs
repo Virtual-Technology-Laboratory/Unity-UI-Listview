@@ -14,7 +14,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
-
 namespace VTL.ListView
 {
     public class Row : MonoBehaviour
@@ -22,41 +21,48 @@ namespace VTL.ListView
         public bool isSelected = false;
         public Guid guid;
 
-        private ListViewManager listViewManager; 
-        private Image image;
-
         public List<GameObject> rowElements = new List<GameObject>();
 
-        void Start()
+        ListViewManager listViewManager; 
+        Image image;
+
+        public void Initialize(object[] fieldData, Guid guid)
         {
+            // Because these are instantiated this gets called before Start so
+            // it is easier to just find the listViewManager here
             listViewManager = transform.parent.
                               transform.parent.
                               transform.parent.gameObject.GetComponent<ListViewManager>();
 
+            // Need a reference to this to set the background color
             image = gameObject.GetComponent<Image>();
-        }
 
-        public void Initialize(object[] fieldData, Guid _guid,
-                               List<HeaderElementInfo> headerElementInfo, 
-                               GameObject RowElementPrefab)
-        {
-            guid = _guid;
-            transform.localScale = Vector3.one;
+            this.guid = guid;
 
+            // Build the row elements (cells)
             rowElements = new List<GameObject>();
-
             for (int i=0; i<fieldData.Length; i++)
             {
-                rowElements.Add(Instantiate(RowElementPrefab));
+                // For each cell add a new RowElementPrefab and set the row as its parent
+                rowElements.Add(Instantiate(listViewManager.RowElementPrefab));
                 rowElements[i].transform.SetParent(transform);
-                rowElements[i].transform.localScale = Vector3.one;
-                rowElements[i].GetComponentInChildren<LayoutElement>().preferredWidth = 
-                    headerElementInfo[i].preferredWidth;
+
+                // Set the text
                 Text rowElementText = rowElements[i].GetComponentInChildren<Text>();
                 rowElementText.text = 
-                    StringifyObject(fieldData[i], headerElementInfo[i].formatString, headerElementInfo[i].dataType); 
-                rowElementText.alignment = 
-                    headerElementInfo[i].horizontalAlignment == HorizontalAlignment.Left ? TextAnchor.MiddleLeft : TextAnchor.MiddleRight;
+                    StringifyObject(fieldData[i],
+                                    listViewManager.headerElementInfo[i].formatString,
+                                    listViewManager.headerElementInfo[i].dataType);
+
+                // Set the preferred width
+                rowElements[i].GetComponentInChildren<LayoutElement>()
+                              .preferredWidth = listViewManager.headerElementInfo[i].preferredWidth;
+
+                // Set the horizontal alignment
+                if (listViewManager.headerElementInfo[i].horizontalAlignment == HorizontalAlignment.Left)
+                    rowElementText.alignment = TextAnchor.MiddleLeft;
+                else
+                    rowElementText.alignment = TextAnchor.MiddleRight;
             }
         }
 
@@ -83,44 +89,36 @@ namespace VTL.ListView
                 return obj.ToString();
         }
 
-        public void SetSelectionAppearance()
+        public void UpdateSelectionAppearance()
         {
             image.color = isSelected ? listViewManager.selectedColor : 
                                        listViewManager.unselectedColor;
         }
 
-        public void SetFields(object[] fieldData, Guid _guid, bool selected,
-                              List<HeaderElementInfo> headerElementInfo)
+        public void SetFields(object[] fieldData, Guid guid, bool selected)
         {
-            guid = _guid;
+            this.guid = guid;
             isSelected = selected;
-            SetSelectionAppearance();
+            UpdateSelectionAppearance();
 
-            Debug.Log(guid.ToString() + ", " + isSelected.ToString());
-
-            for (int i = 0; i < headerElementInfo.Count; i++)
-            {
+            for (int i = 0; i < listViewManager.headerElementInfo.Count; i++)
                 rowElements[i].GetComponentInChildren<Text>().text =
-                    StringifyObject(fieldData[i], 
-                                    headerElementInfo[i].formatString, 
-                                    headerElementInfo[i].dataType); 
-            }
+                    StringifyObject(fieldData[i],
+                                    listViewManager.headerElementInfo[i].formatString,
+                                    listViewManager.headerElementInfo[i].dataType); 
         }
 
-        public void SetFields(Dictionary<string, object> rowData, Guid _guid, bool selected,
-                              List<HeaderElementInfo> headerElementInfo)
+        public void SetFields(Dictionary<string, object> rowData, Guid guid, bool selected)
         {
-            guid = _guid;
+            this.guid = guid;
             isSelected = selected;
-            SetSelectionAppearance();
+            UpdateSelectionAppearance();
 
-            for (int i = 0; i < headerElementInfo.Count; i++)
-            {
+            for (int i = 0; i < listViewManager.headerElementInfo.Count; i++)
                 rowElements[i].GetComponentInChildren<Text>().text =
-                    StringifyObject(rowData[headerElementInfo[i].text], 
-                                    headerElementInfo[i].formatString, 
-                                    headerElementInfo[i].dataType);
-            }
+                    StringifyObject(rowData[listViewManager.headerElementInfo[i].text],
+                                    listViewManager.headerElementInfo[i].formatString,
+                                    listViewManager.headerElementInfo[i].dataType);
         }
 
         public void OnSelectionEvent()
