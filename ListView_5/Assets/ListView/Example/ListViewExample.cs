@@ -62,11 +62,11 @@ public class ListViewExample : MonoBehaviour
     object[] RandomRowData()
     {
         return new object[] { RandomString(4), 
-                              RandomBool(), 
-                              Random.Range((int)0, (int)100), 
-                              Random.Range(0, 1f), 
-                              (double)Random.Range(1e3f, 1e9f), 
-                              RandomDateTime() };
+                              RandomString(4), 
+                              RandomString(4), 
+                              RandomDateTime(),  
+                              RandomDateTime(),
+                              RandomString(4) };
     }
 
     System.DateTime RandomDateTime()
