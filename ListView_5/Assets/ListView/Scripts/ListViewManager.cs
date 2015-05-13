@@ -17,8 +17,10 @@ using System.Collections.Generic;
 namespace VTL.ListView
 {
 
+
     public enum DataType { String, Bool, Int, Float, Double, DateTime, TimeSpan };
-    public enum HorizontalAlignment {Left, Right};
+    public enum HorizontalAlignment { Left, Right };
+    public enum ListSelection { Many, One, None };
 
     [System.Serializable]
     public class HeaderElementInfo
@@ -32,11 +34,15 @@ namespace VTL.ListView
 
     public class ListViewManager : MonoBehaviour
     {
+        public delegate void SelectionChangeAction();
+        public static event SelectionChangeAction SelectionChangeEvent;
+
         public List<HeaderElementInfo> headerElementInfo = new List<HeaderElementInfo>();
 
         public float rowHeight = 26f;
         public Color unselectedColor = Color.white;
         public Color selectedColor = new Color(0.1f, 0.1f, 0.1f, 0.4f);
+        public ListSelection listSelection = ListSelection.Many;
 
         public GameObject HeaderElementPrefab;
         public GameObject RowPrefab;
@@ -129,12 +135,10 @@ namespace VTL.ListView
                 new Vector2(listPanelRectTransform.sizeDelta.x, rows.Count * rowHeight);
         }
 
-        public void AddRow(object[] fieldData)
+        public void AddRow(object[] fieldData, Guid guid)
         {
             if (fieldData.Length != headerElementInfo.Count)
                 throw new System.Exception("fieldData does not match the size of the table!");
-
-            Guid guid = Guid.NewGuid();
 
             rows.Add(guid, Instantiate(RowPrefab));
             rows[guid].transform.SetParent(listPanel.transform);
@@ -145,10 +149,15 @@ namespace VTL.ListView
 
             for (int i = 0; i < fieldData.Length; i++)
                 listData[guid].Add(headerElementInfo[i].text, fieldData[i]);
-          
+
             listData[guid].Add(SELECTED, false);
             listData[guid].Add(GUID, guid);
+        }
 
+        public void AddRow(object[] fieldData)
+        {
+            Guid guid = Guid.NewGuid();
+            AddRow(fieldData, guid);
         }
 
         public void OnSelectionEvent(Guid guid, int index)
@@ -160,22 +169,38 @@ namespace VTL.ListView
             //
             // In this method we the selection logic and the SetRowSelection
             // method calls back to set the appearance of the row.
-            if (shiftDown)
+            if (listSelection == ListSelection.Many)
             {
-                shiftDownSelections.Add(index);
-
-                if (shiftDownSelections.Count == 1)
-                    SetRowSelection(guid, true);
-                else
+                if (shiftDown)
                 {
-                    int minIndx = Mathf.Min(shiftDownSelections.ToArray());
-                    int maxIndx = Mathf.Max(shiftDownSelections.ToArray());
-                    for (int i = minIndx; i < maxIndx + 1; i++)
-                        SetRowSelection(i, true);
+                    shiftDownSelections.Add(index);
+
+                    if (shiftDownSelections.Count == 1)
+                        SetRowSelection(guid, true);
+                    else
+                    {
+                        int minIndx = Mathf.Min(shiftDownSelections.ToArray());
+                        int maxIndx = Mathf.Max(shiftDownSelections.ToArray());
+                        for (int i = minIndx; i < maxIndx + 1; i++)
+                            SetRowSelection(i, true);
+                    }
                 }
+                else
+                    SetRowSelection(guid, !rows[guid].GetComponent<Row>().isSelected);
+            }
+            else if (listSelection == ListSelection.One)
+            {
+                bool newState = !rows[guid].GetComponent<Row>().isSelected;
+                DeselectAll();
+                SetRowSelection(guid, newState);
             }
             else
-                SetRowSelection(guid, !rows[guid].GetComponent<Row>().isSelected);
+            {
+                return;
+            }
+
+            if (SelectionChangeEvent != null)
+                SelectionChangeEvent();
         }
 
         public void SelectAll()

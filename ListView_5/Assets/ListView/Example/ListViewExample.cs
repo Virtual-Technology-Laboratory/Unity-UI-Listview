@@ -7,9 +7,7 @@ using VTL.ListView;
 
 public class ListViewExample : MonoBehaviour
 {
-
     public ListViewManager listViewManager;
-
 
     // gets called (less frequently) on physics updates
     void FixedUpdate()

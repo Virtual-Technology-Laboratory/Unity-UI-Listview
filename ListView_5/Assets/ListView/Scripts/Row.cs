@@ -34,6 +34,8 @@ namespace VTL.ListView
                               transform.parent.
                               transform.parent.gameObject.GetComponent<ListViewManager>();
 
+            transform.localScale = Vector3.one;
+
             // Need a reference to this to set the background color
             image = gameObject.GetComponent<Image>();
 
@@ -46,6 +48,7 @@ namespace VTL.ListView
                 // For each cell add a new RowElementPrefab and set the row as its parent
                 rowElements.Add(Instantiate(listViewManager.RowElementPrefab));
                 rowElements[i].transform.SetParent(transform);
+                rowElements[i].transform.localScale = Vector3.one;
 
                 // Set the text
                 Text rowElementText = rowElements[i].GetComponentInChildren<Text>();

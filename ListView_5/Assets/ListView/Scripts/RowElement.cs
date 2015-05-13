@@ -26,6 +26,7 @@ namespace VTL.ListView
                       .AddListener(transform.parent
                                             .gameObject
                                             .GetComponent<Row>().OnSelectionEvent);
+
         }
 
     }

@@ -6,5 +6,3 @@ Here's a demonstration of a listview for Unity's new UI. It supports a generic
 number of columns, allows you to specify the datatype of columns, and 
 dynamically populates and sorts row data.
 
-A youTube demonstration is available at:
-https://www.youtube.com/watch?v=ipDTpD8CGWM
