@@ -2,7 +2,10 @@
 Unity UI Listview
 ===================
 
-Here's a demonstration of a listview for Unity's new UI. It supports a generic 
-number of columns, allows you to specify the datatype of columns, and 
-dynamically populates and sorts row data.
+Here's a demonstration of a listview for Unity's new UI. Provides a sortable 
+list view interface for Unity's new UI system. The columns are type aware such 
+that the numerical values, datetimes, and timespans can be intelligently sorted. 
+The row selection is configurable such that one, many or no rows can be selected 
+using mouse clicks or shift+click for selecting multiple rows. The manager 
+exposes an OnSelectionEvent to which other scripts can subscribe.
 
